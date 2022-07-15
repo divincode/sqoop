@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -41,9 +41,9 @@ import org.apache.log4j.Logger;
 import org.apache.sqoop.manager.oracle.OraOopOutputFormatInsert.InsertMode;
 import org.apache.sqoop.manager.oracle.OraOopOutputFormatUpdate.UpdateMode;
 
-import com.cloudera.sqoop.Sqoop;
-import com.cloudera.sqoop.SqoopOptions;
-import com.cloudera.sqoop.mapreduce.ExportJobBase;
+import org.apache.sqoop.Sqoop;
+import org.apache.sqoop.SqoopOptions;
+import org.apache.sqoop.mapreduce.ExportJobBase;
 
 /**
  * Utilities used by OraOop.

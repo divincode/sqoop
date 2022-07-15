@@ -28,8 +28,8 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.ParseException;
-import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -37,10 +37,10 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.sqoop.mapreduce.netezza.NetezzaExternalTableExportJob;
 import org.apache.sqoop.mapreduce.netezza.NetezzaExternalTableImportJob;
 
-import com.cloudera.sqoop.SqoopOptions;
-import com.cloudera.sqoop.cli.RelatedOptions;
-import com.cloudera.sqoop.util.ExportException;
-import com.cloudera.sqoop.util.ImportException;
+import org.apache.sqoop.SqoopOptions;
+import org.apache.sqoop.cli.RelatedOptions;
+import org.apache.sqoop.util.ExportException;
+import org.apache.sqoop.util.ImportException;
 
 /**
  * Manages direct mode transfers from Netezza databases using the external table
@@ -184,7 +184,7 @@ public class DirectNetezzaManager extends NetezzaManager {
   /**
    * Export data stored in HDFS into a table in a database.
    */
-  public void exportTable(com.cloudera.sqoop.manager.ExportJobContext context)
+  public void exportTable(org.apache.sqoop.manager.ExportJobContext context)
       throws IOException, ExportException {
     options = context.getOptions();
     context.setConnManager(this);
@@ -214,7 +214,7 @@ public class DirectNetezzaManager extends NetezzaManager {
    * data from the database and upload the files directly to HDFS.
    */
   @Override
-  public void importTable(com.cloudera.sqoop.manager.ImportJobContext context)
+  public void importTable(org.apache.sqoop.manager.ImportJobContext context)
       throws IOException, ImportException {
 
     context.setConnManager(this);

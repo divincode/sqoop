@@ -18,6 +18,12 @@
 
 package org.apache.sqoop.tool;
 
+import static java.lang.String.format;
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.apache.sqoop.mapreduce.parquet.ParquetConstants.PARQUET_JOB_CONFIGURATOR_IMPLEMENTATION_KEY;
+import static org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation.valueOf;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -33,20 +39,23 @@ import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.sqoop.manager.SupportedManagers;
 import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
+import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorFactory;
+import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation;
 import org.apache.sqoop.util.CredentialsUtil;
 import org.apache.sqoop.util.LoggingUtils;
 import org.apache.sqoop.util.password.CredentialProviderHelper;
 
-import com.cloudera.sqoop.ConnFactory;
-import com.cloudera.sqoop.SqoopOptions;
-import com.cloudera.sqoop.SqoopOptions.IncrementalMode;
-import com.cloudera.sqoop.SqoopOptions.InvalidOptionsException;
-import com.cloudera.sqoop.cli.RelatedOptions;
-import com.cloudera.sqoop.cli.ToolOptions;
-import com.cloudera.sqoop.lib.DelimiterSet;
-import com.cloudera.sqoop.manager.ConnManager;
-import com.cloudera.sqoop.metastore.JobData;
+import org.apache.sqoop.ConnFactory;
+import org.apache.sqoop.SqoopOptions;
+import org.apache.sqoop.SqoopOptions.IncrementalMode;
+import org.apache.sqoop.SqoopOptions.InvalidOptionsException;
+import org.apache.sqoop.cli.RelatedOptions;
+import org.apache.sqoop.cli.ToolOptions;
+import org.apache.sqoop.lib.DelimiterSet;
+import org.apache.sqoop.manager.ConnManager;
+import org.apache.sqoop.metastore.JobData;
 
 /**
  * Layer on top of SqoopTool that provides some basic common code
@@ -55,7 +64,7 @@ import com.cloudera.sqoop.metastore.JobData;
  * Subclasses should call init() at the top of their run() method,
  * and call destroy() at the end in a finally block.
  */
-public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
+public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
 
   public static final String METADATA_TRANSACTION_ISOLATION_LEVEL = "metadata-transaction-isolation-level";
 
@@ -94,6 +103,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String TARGET_DIR_ARG = "target-dir";
   public static final String APPEND_ARG = "append";
   public static final String DELETE_ARG = "delete-target-dir";
+  public static final String DELETE_COMPILE_ARG = "delete-compile-dir";
   public static final String NULL_STRING = "null-string";
   public static final String INPUT_NULL_STRING = "input-null-string";
   public static final String NULL_NON_STRING = "null-non-string";
@@ -130,6 +140,9 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String HCATALOG_STORAGE_STANZA_ARG =
     "hcatalog-storage-stanza";
   public static final String HCATALOG_HOME_ARG = "hcatalog-home";
+  public static final String HS2_URL_ARG = "hs2-url";
+  public static final String HS2_USER_ARG = "hs2-user";
+  public static final String HS2_KEYTAB_ARG = "hs2-keytab";
   public static final String MAPREDUCE_JOB_NAME = "mapreduce-job-name";
   public static final String NUM_MAPPERS_ARG = "num-mappers";
   public static final String NUM_MAPPERS_SHORT_ARG = "m";
@@ -174,6 +187,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String THROW_ON_ERROR_ARG = "throw-on-error";
   public static final String ORACLE_ESCAPING_DISABLED = "oracle-escaping-disabled";
   public static final String ESCAPE_MAPPING_COLUMN_NAMES_ENABLED = "escape-mapping-column-names";
+  public static final String PARQUET_CONFIGURATOR_IMPLEMENTATION = "parquet-configurator-implementation";
 
   // Arguments for validation.
   public static final String VALIDATE_ARG = "validate";
@@ -198,6 +212,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String HBASE_BULK_LOAD_ENABLED_ARG =
       "hbase-bulkload";
   public static final String HBASE_CREATE_TABLE_ARG = "hbase-create-table";
+  public static final String HBASE_NULL_INCREMENTAL_MODE_ARG = "hbase-null-incremental-mode";
 
   //Accumulo arguments.
   public static final String ACCUMULO_TABLE_ARG = "accumulo-table";
@@ -216,6 +231,8 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
 
   // Arguments for the saved job management system.
   public static final String STORAGE_METASTORE_ARG = "meta-connect";
+  public static final String METASTORE_USER_ARG = "meta-username";
+  public static final String METASTORE_PASS_ARG = "meta-password";
   public static final String JOB_CMD_CREATE_ARG = "create";
   public static final String JOB_CMD_DELETE_ARG = "delete";
   public static final String JOB_CMD_EXEC_ARG = "exec";
@@ -310,7 +327,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   }
 
   /**
-   * Examines a subset of the arrray presented, and determines if it
+   * Examines a subset of the array presented, and determines if it
    * contains any non-empty arguments. If so, logs the arguments
    * and returns true.
    *
@@ -378,6 +395,16 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
         .hasArg()
         .withDescription("Specify JDBC connect string for the metastore")
         .withLongOpt(STORAGE_METASTORE_ARG)
+        .create());
+    relatedOpts.addOption(OptionBuilder.withArgName("metastore-db-username")
+        .hasArg()
+        .withDescription("Specify the username string for the metastore")
+        .withLongOpt(METASTORE_USER_ARG)
+        .create());
+    relatedOpts.addOption(OptionBuilder.withArgName("metastore-db-password")
+        .hasArg()
+        .withDescription("Specify the password string for the metastore")
+        .withLongOpt(METASTORE_PASS_ARG)
         .create());
 
     // Create an option-group surrounding the operations a user
@@ -595,6 +622,21 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
           + " types.")
         .withLongOpt(MAP_COLUMN_HIVE)
         .create());
+    hiveOpts.addOption(OptionBuilder
+        .hasArg()
+        .withDescription("The URL to the HiveServer2.")
+        .withLongOpt(HS2_URL_ARG)
+        .create());
+    hiveOpts.addOption(OptionBuilder
+        .hasArg()
+        .withDescription("The user/principal for HiveServer2.")
+        .withLongOpt(HS2_USER_ARG)
+        .create());
+    hiveOpts.addOption(OptionBuilder
+        .hasArg()
+        .withDescription("The location of the keytab of the HiveServer2 user.")
+        .withLongOpt(HS2_KEYTAB_ARG)
+        .create());
 
     return hiveOpts;
   }
@@ -765,6 +807,10 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
         .withDescription("Output directory for compiled objects")
         .withLongOpt(BIN_OUT_DIR_ARG)
         .create());
+    codeGenOpts.addOption(OptionBuilder
+        .withDescription("Delete compile directory")
+        .withLongOpt(DELETE_COMPILE_ARG)
+        .create());
     codeGenOpts.addOption(OptionBuilder.withArgName("name")
         .hasArg()
         .withDescription("Put auto-generated classes in this package")
@@ -839,6 +885,11 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     hbaseOpts.addOption(OptionBuilder
         .withDescription("If specified, create missing HBase tables")
         .withLongOpt(HBASE_CREATE_TABLE_ARG)
+        .create());
+    hbaseOpts.addOption(OptionBuilder.withArgName("nullmode")
+        .hasArg()
+        .withDescription("How to handle null values during incremental import into HBase.")
+        .withLongOpt(HBASE_NULL_INCREMENTAL_MODE_ARG)
         .create());
 
     return hbaseOpts;
@@ -1103,6 +1154,8 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       out.setEscapeMappingColumnNamesEnabled(Boolean.parseBoolean(in.getOptionValue(
           ESCAPE_MAPPING_COLUMN_NAMES_ENABLED)));
     }
+
+    applyParquetJobConfigurationImplementation(in, out);
   }
 
   private void applyCredentialsOptions(CommandLine in, SqoopOptions out)
@@ -1218,6 +1271,15 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
    }
    if (in.hasOption(HIVE_EXTERNAL_TABLE_LOCATION_ARG)) {
      out.setHiveExternalTableDir(in.getOptionValue(HIVE_EXTERNAL_TABLE_LOCATION_ARG));
+   }
+   if (in.hasOption(HS2_URL_ARG)) {
+      out.setHs2Url(in.getOptionValue(HS2_URL_ARG));
+   }
+   if (in.hasOption(HS2_USER_ARG)) {
+      out.setHs2User(in.getOptionValue(HS2_USER_ARG));
+   }
+   if (in.hasOption(HS2_KEYTAB_ARG)) {
+      out.setHs2Keytab(in.getOptionValue(HS2_KEYTAB_ARG));
    }
 
   }
@@ -1367,6 +1429,10 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       out.setJarOutputDir(in.getOptionValue(BIN_OUT_DIR_ARG));
     }
 
+    if (in.hasOption(DELETE_COMPILE_ARG)) {
+      out.setDeleteJarOutputDir(true);
+    }
+
     if (in.hasOption(PACKAGE_NAME_ARG)) {
       out.setPackageName(in.getOptionValue(PACKAGE_NAME_ARG));
     }
@@ -1385,7 +1451,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     }
   }
 
-  protected void applyHBaseOptions(CommandLine in, SqoopOptions out) {
+  protected void applyHBaseOptions(CommandLine in, SqoopOptions out) throws InvalidOptionsException {
     if (in.hasOption(HBASE_TABLE_ARG)) {
       out.setHBaseTable(in.getOptionValue(HBASE_TABLE_ARG));
     }
@@ -1402,6 +1468,19 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
 
     if (in.hasOption(HBASE_CREATE_TABLE_ARG)) {
       out.setCreateHBaseTable(true);
+    }
+
+    if (in.hasOption(HBASE_NULL_INCREMENTAL_MODE_ARG)) {
+      String nullMode = in.getOptionValue(HBASE_NULL_INCREMENTAL_MODE_ARG);
+      if ("ignore".equals(nullMode)) {
+        out.setHbaseNullIncrementalMode(SqoopOptions.HBaseNullIncrementalMode.Ignore);
+      } else if ("delete".equals(nullMode)) {
+        out.setHbaseNullIncrementalMode(SqoopOptions.HBaseNullIncrementalMode.Delete);
+      } else {
+        throw new InvalidOptionsException("Unknown HBase null incremental mode: "
+            + nullMode + ". Use 'ignore' or 'delete'."
+            + HELP_STR);
+      }
     }
   }
 
@@ -1508,14 +1587,6 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
         + "importing into SequenceFile format.");
     }
 
-    // Hive import and create hive table not compatible for ParquetFile format
-    if (options.doHiveImport()
-        && options.doFailIfHiveTableExists()
-        && options.getFileLayout() == SqoopOptions.FileLayout.ParquetFile) {
-      throw new InvalidOptionsException("Hive import and create hive table is not compatible with "
-        + "importing into ParquetFile format.");
-      }
-
     if (options.doHiveImport()
         && options.getIncrementalMode().equals(IncrementalMode.DateLastModified)) {
       throw new InvalidOptionsException(HIVE_IMPORT_WITH_LASTMODIFIED_NOT_SUPPORTED);
@@ -1580,12 +1651,14 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     }
     // importing to Hive external tables requires target directory to be set
     // for external table's location
-    Boolean isNotHiveImportButExternalTableDirIsSet = !options.doHiveImport() && !org.apache.commons.lang.StringUtils.isBlank(options.getHiveExternalTableDir());
+    Boolean isNotHiveImportButExternalTableDirIsSet = !options.doHiveImport() && !isBlank(options.getHiveExternalTableDir());
     if (isNotHiveImportButExternalTableDirIsSet) {
       LOG.warn("Importing to external Hive table requires --hive-import parameter to be set");
       throw new InvalidOptionsException("Importing to external Hive table requires --hive-import parameter to be set."
           + HELP_STR);
     }
+
+    validateHS2Options(options);
   }
 
   protected void validateAccumuloOptions(SqoopOptions options)
@@ -1768,7 +1841,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   }
 
   private boolean isSet(String option) {
-    return org.apache.commons.lang.StringUtils.isNotBlank(option);
+    return isNotBlank(option);
   }
 
   protected void validateHBaseOptions(SqoopOptions options)
@@ -1811,5 +1884,52 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
 
     return dashPos;
   }
-}
 
+  protected void validateHasDirectConnectorOption(SqoopOptions options) throws SqoopOptions.InvalidOptionsException {
+    SupportedManagers m = SupportedManagers.createFrom(options);
+    if (m != null && options.isDirect() && !m.hasDirectConnector()) {
+      throw new SqoopOptions.InvalidOptionsException(
+          "Was called with the --direct option, but no direct connector available.");
+    }
+  }
+
+  protected void validateHS2Options(SqoopOptions options) throws SqoopOptions.InvalidOptionsException {
+    final String withoutTemplate = "The %s option cannot be used without the %s option.";
+
+    if (isSet(options.getHs2Url()) && !options.doHiveImport()) {
+      throw new InvalidOptionsException(format(withoutTemplate, HS2_URL_ARG, HIVE_IMPORT_ARG));
+    }
+
+    if (isSet(options.getHs2User()) && !isSet(options.getHs2Url())) {
+      throw  new InvalidOptionsException(format(withoutTemplate, HS2_USER_ARG, HS2_URL_ARG));
+    }
+
+    if (isSet(options.getHs2Keytab()) && !isSet(options.getHs2User())) {
+      throw  new InvalidOptionsException(format(withoutTemplate, HS2_KEYTAB_ARG, HS2_USER_ARG));
+    }
+  }
+
+  private void applyParquetJobConfigurationImplementation(CommandLine in, SqoopOptions out) throws InvalidOptionsException {
+    String optionValue = in.getOptionValue(PARQUET_CONFIGURATOR_IMPLEMENTATION);
+    String propertyValue = out.getConf().get(PARQUET_JOB_CONFIGURATOR_IMPLEMENTATION_KEY);
+
+    String valueToUse = isBlank(optionValue) ? propertyValue : optionValue;
+
+    if (isBlank(valueToUse)) {
+      LOG.debug("Parquet job configurator implementation is not set, using default value: " + out.getParquetConfiguratorImplementation());
+      return;
+    }
+
+    try {
+      ParquetJobConfiguratorImplementation parquetConfiguratorImplementation = valueOf(valueToUse.toUpperCase());
+      out.setParquetConfiguratorImplementation(parquetConfiguratorImplementation);
+      LOG.debug("Parquet job configurator implementation set: " + parquetConfiguratorImplementation);
+    } catch (IllegalArgumentException e) {
+      throw new InvalidOptionsException(format("Invalid Parquet job configurator implementation is set: %s. Supported values are: %s", valueToUse, Arrays.toString(ParquetJobConfiguratorImplementation.values())));
+    }
+  }
+
+  public ParquetJobConfiguratorFactory getParquetJobConfigurator(SqoopOptions sqoopOptions) {
+    return sqoopOptions.getParquetConfiguratorImplementation().createFactory();
+  }
+}

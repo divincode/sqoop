@@ -32,25 +32,26 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.sqoop.mapreduce.ImportJobBase;
 
-import com.cloudera.sqoop.SqoopOptions;
-import com.cloudera.sqoop.lib.BigDecimalSerializer;
-import com.cloudera.sqoop.lib.BlobRef;
-import com.cloudera.sqoop.lib.BooleanParser;
-import com.cloudera.sqoop.lib.ClobRef;
-import com.cloudera.sqoop.lib.DelimiterSet;
-import com.cloudera.sqoop.lib.FieldFormatter;
-import com.cloudera.sqoop.lib.JdbcWritableBridge;
-import com.cloudera.sqoop.lib.LargeObjectLoader;
-import com.cloudera.sqoop.lib.LobSerializer;
-import com.cloudera.sqoop.lib.RecordParser;
-import com.cloudera.sqoop.lib.SqoopRecord;
-import com.cloudera.sqoop.manager.ConnManager;
+import org.apache.sqoop.SqoopOptions;
+import org.apache.sqoop.lib.BigDecimalSerializer;
+import org.apache.sqoop.lib.BlobRef;
+import org.apache.sqoop.lib.BooleanParser;
+import org.apache.sqoop.lib.ClobRef;
+import org.apache.sqoop.lib.DelimiterSet;
+import org.apache.sqoop.lib.FieldFormatter;
+import org.apache.sqoop.lib.JdbcWritableBridge;
+import org.apache.sqoop.lib.LargeObjectLoader;
+import org.apache.sqoop.lib.LobSerializer;
+import org.apache.sqoop.lib.RecordParser;
+import org.apache.sqoop.lib.SqoopRecord;
+import org.apache.sqoop.manager.ConnManager;
+import org.apache.sqoop.util.DirCleanupHook;
 
 /**
  * Creates an ORM class to represent a table from a database.
@@ -1783,6 +1784,12 @@ public class ClassWriter {
       String colTypeStr = sbColTypes.toString();
       LOG.debug("Columns: " + colTypeStr);
       LOG.debug("sourceFilename is " + sourceFilename);
+    }
+
+    // SQOOP-3042 - Sqoop does not clear compile directory under /tmp/sqoop-<username>/compile
+    // Add shutdown hook so that all files under the jar output dir can be cleared
+    if(options.getDeleteJarOutputDir()) {
+      Runtime.getRuntime().addShutdownHook(new DirCleanupHook(options.getJarOutputDir()));
     }
 
     compileManager.addSourceFile(sourceFilename);

@@ -18,28 +18,18 @@
 
 package org.apache.sqoop.manager.oracle;
 
-import com.cloudera.sqoop.SqoopOptions;
-import com.cloudera.sqoop.manager.OracleUtils;
-import com.cloudera.sqoop.testutil.CommonArgs;
-import com.cloudera.sqoop.testutil.ImportJobTestCase;
+import org.apache.sqoop.SqoopOptions;
+import org.apache.sqoop.manager.oracle.util.OracleUtils;
+import org.apache.sqoop.testutil.CommonArgs;
+import org.apache.sqoop.testutil.ImportJobTestCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Writer;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -101,7 +91,7 @@ public class OracleSplitterTest extends ImportJobTestCase {
     args.add("--connect");
     args.add(getConnectString());
     args.add("--target-dir");
-    args.add(getWarehouseDir());
+    args.add(getTablePath().toString());
     args.add("--num-mappers");
     args.add("2");
     args.add("--split-by");
@@ -137,13 +127,13 @@ public class OracleSplitterTest extends ImportJobTestCase {
     List<String> lines;
 
     // First row should be in the first file
-    file = new File(this.getWarehouseDir(), "part-m-00000");
+    file = new File(getTablePath().toString(), "part-m-00000");
     lines = FileUtils.readLines(file, "UTF-8");
     assertEquals(1, lines.size());
     assertEquals("1,old_data,1999-01-01 11:11:11.0", lines.get(0));
 
     // With second line in the second file
-    file = new File(this.getWarehouseDir(), "part-m-00001");
+    file = new File(getTablePath().toString(), "part-m-00001");
     lines = FileUtils.readLines(file, "UTF-8");
     assertEquals(1, lines.size());
     assertEquals("2,new_data,2000-11-11 23:23:23.0", lines.get(0));

@@ -41,9 +41,9 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.Shell;
 
-import com.cloudera.sqoop.SqoopOptions;
-import com.cloudera.sqoop.util.FileListing;
-import com.cloudera.sqoop.util.Jars;
+import org.apache.sqoop.SqoopOptions;
+import org.apache.sqoop.util.FileListing;
+import org.apache.sqoop.util.Jars;
 
 import static org.apache.commons.lang3.StringUtils.substringBeforeLast;
 
@@ -245,13 +245,14 @@ public class CompilationManager {
         }
       }
       try {
-          FileUtils.moveFile(fOrig, fDest);
+        LOG.debug("moving file from " + fOrig.getAbsolutePath() + " to " + fDest.getAbsolutePath());
+        FileUtils.moveFile(fOrig, fDest);
       } catch (IOException e) {
-    	  /*Removed the exception being thrown
-    	   *even if the .java file can not be renamed
-    	   *or can not be moved a "dest" directory for
-    	   *any reason.*/
-          LOG.debug("Could not rename " + orig + " to " + dest); 
+        /*Removed the exception being thrown
+         *even if the .java file can not be renamed
+         *or can not be moved a "dest" directory for
+         *any reason.*/
+        LOG.error("Could not rename " + orig + " to " + dest + ". Error: " + e.getMessage());
       }
     }
   }

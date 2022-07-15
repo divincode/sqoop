@@ -21,9 +21,10 @@ package org.apache.sqoop.tool;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -32,13 +33,14 @@ import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
 
-import com.cloudera.sqoop.SqoopOptions.InvalidOptionsException;
-import com.cloudera.sqoop.hive.HiveImport;
+import org.apache.sqoop.SqoopOptions.InvalidOptionsException;
 import org.apache.avro.Schema;
 import org.apache.sqoop.SqoopOptions;
 import org.apache.sqoop.avro.AvroSchemaMismatchException;
+import org.apache.sqoop.hive.HiveClientFactory;
 import org.apache.sqoop.util.ExpectedLogMessage;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;
@@ -60,6 +62,23 @@ public class TestImportTool {
   @Rule
   public ExpectedLogMessage logMessage = new ExpectedLogMessage();
 
+  private ImportTool importTool;
+
+  private ImportTool importToolSpy;
+
+  private CodeGenTool codeGenTool;
+
+  private HiveClientFactory hiveClientFactory;
+
+  @Before
+  public void before() {
+    codeGenTool = mock(CodeGenTool.class);
+    hiveClientFactory = mock(HiveClientFactory.class);
+
+    importTool = new ImportTool("import", codeGenTool, false, hiveClientFactory);
+    importToolSpy = spy(importTool);
+  }
+
   @Theory
   public void esnureTransactionIsolationLevelsAreMappedToTheRightValues(Object[] values)
       throws Exception {
@@ -75,9 +94,7 @@ public class TestImportTool {
     final String actualSchemaString = "actualSchema";
     final String errorMessage = "Import failed";
 
-    ImportTool importTool = spy(new ImportTool("import", mock(CodeGenTool.class), false));
-
-    doReturn(true).when(importTool).init(any(com.cloudera.sqoop.SqoopOptions.class));
+    doReturn(true).when(importToolSpy).init(any(SqoopOptions.class));
 
     Schema writtenWithSchema = mock(Schema.class);
     when(writtenWithSchema.toString()).thenReturn(writtenWithSchemaString);
@@ -85,13 +102,13 @@ public class TestImportTool {
     when(actualSchema.toString()).thenReturn(actualSchemaString);
 
     AvroSchemaMismatchException expectedException = new AvroSchemaMismatchException(errorMessage, writtenWithSchema, actualSchema);
-    doThrow(expectedException).when(importTool).importTable(any(com.cloudera.sqoop.SqoopOptions.class), anyString(), any(HiveImport.class));
+    doThrow(expectedException).when(importToolSpy).importTable(any(SqoopOptions.class));
 
-    com.cloudera.sqoop.SqoopOptions sqoopOptions = mock(com.cloudera.sqoop.SqoopOptions.class);
+    SqoopOptions sqoopOptions = mock(SqoopOptions.class);
     when(sqoopOptions.doHiveImport()).thenReturn(true);
 
     logMessage.expectError(expectedException.getMessage());
-    int result = importTool.run(sqoopOptions);
+    int result = importToolSpy.run(sqoopOptions);
     assertEquals(1, result);
   }
 
@@ -100,11 +117,25 @@ public class TestImportTool {
   @Test (expected = InvalidOptionsException.class)
   public void testExternalTableNoHiveImportThrowsException() throws InvalidOptionsException {
     String hdfsTableDir = "/data/movielens/genre";
-    com.cloudera.sqoop.SqoopOptions options = new com.cloudera.sqoop.SqoopOptions("jdbc:postgresql://localhost/movielens", "genres");
+    SqoopOptions options = new SqoopOptions("jdbc:postgresql://localhost/movielens", "genres");
     options.setHiveExternalTableDir(hdfsTableDir);
     ImportTool tool = new ImportTool("Import Tool", false);
     tool.validateHiveOptions(options);
     Assert.fail("testExternalTableNoHiveImportThrowsException unit test failed!");
   }
 
+  @Test
+  public void testShouldCheckExistingOutputDirectoryReturnsFalseForHBaseImport() {
+    SqoopOptions sqoopOptions = mock(SqoopOptions.class);
+    when(sqoopOptions.getHBaseTable()).thenReturn("hbasetable");
+
+    assertFalse(importTool.shouldCheckExistingOutputDirectory(sqoopOptions));
+  }
+
+  @Test
+  public void testShouldCheckExistingOutputDirectoryReturnsTrueForNonHBaseImport() {
+    SqoopOptions sqoopOptions = mock(SqoopOptions.class);
+
+    assertTrue(importTool.shouldCheckExistingOutputDirectory(sqoopOptions));
+  }
 }
