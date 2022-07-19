@@ -96,7 +96,7 @@ ant instead. You have been warned!
     <hadoopVersion>0.20.2-cdh3u1</hadoopVersion>
 
     <hbaseVersion>0.90.3-cdh3u1</hbaseVersion>
-    <log4j.version>1.2.16</log4j.version>
+    <reload4j.version>1.2.21</reload4j.version>
 
   </properties>
 
@@ -259,14 +259,14 @@ ant instead. You have been warned!
 
     <dependency>
       <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
-      <version>1.5.8</version>
+      <artifactId>slf4j-reload4j</artifactId>
+      <version>1.7.36</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
-      <version>${log4j.version}</version>
+      <groupId>ch.qos.reload4j</groupId>
+      <artifactId>reload4j</artifactId>
+      <version>${reload4j.version}</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>

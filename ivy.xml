@@ -98,7 +98,7 @@ under the License.
     <dependency org="commons-codec" name="commons-codec"
       rev="${commons-codec.version}" conf="common->default;redist->default"/>
 
-    <dependency org="log4j" name="log4j" rev="${log4j.version}"
+    <dependency org="ch.qos.reload4j" name="reload4j" rev="${reload4j.version}"
       conf="common->master" />
     <dependency org="junit" name="junit" rev="${junit.version}"
       conf="test->default"/>
